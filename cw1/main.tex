@@ -1,0 +1,581 @@
+%----------------------------------------------------------------------------------------
+
+\documentclass[a4paper]{article} % Uses article class in A4 format
+
+%----------------------------------------------------------------------------------------
+%	FORMATTING
+%----------------------------------------------------------------------------------------
+
+\addtolength{\hoffset}{-2.25cm}
+\addtolength{\textwidth}{4.5cm}
+\addtolength{\voffset}{-3.25cm}
+\addtolength{\textheight}{5cm}
+\setlength{\parskip}{0pt}
+\setlength{\parindent}{5pt}
+
+%----------------------------------------------------------------------------------------
+%	PACKAGES AND OTHER DOCUMENT CONFIGURATIONS
+%----------------------------------------------------------------------------------------
+
+\usepackage{caption}
+\usepackage[inkscapelatex=false]{svg}
+\usepackage{blindtext} % Package to generate dummy text
+\usepackage[toc,page]{appendix}
+\usepackage{dirtytalk}
+
+\usepackage{charter} % Use the Charter font
+\usepackage[utf8]{inputenc} % Use UTF-8 encoding
+\usepackage{microtype} % Slightly tweak font spacing for aesthetics
+
+\usepackage[english]{babel} % Language hyphenation and typographical rules
+
+\usepackage{amsthm, amsmath, amssymb} % Mathematical typesetting
+\usepackage{float} % Improved interface for floating objects
+\usepackage[final, colorlinks = true,
+            linkcolor = black,
+            citecolor = black]{hyperref} % For hyperlinks in the PDF
+\usepackage{graphicx, multicol} % Enhanced support for graphics
+\usepackage{xcolor} % Driver-independent color extensions
+\usepackage{marvosym, wasysym} % More symbols
+\usepackage{rotating} % Rotation tools
+\usepackage{censor} % Facilities for controlling restricted text
+\usepackage{pseudocode} % Environment for specifying algorithms in a natural way
+\usepackage{booktabs} % Enhances quality of tables
+\usepackage{minted}
+
+\newenvironment{packed_enum}{
+\begin{enumerate}
+  \setlength{\itemsep}{1pt}
+  \setlength{\parskip}{0pt}
+  \setlength{\parsep}{0pt}
+}{\end{enumerate}}
+
+\usepackage{tikz-qtree} % Easy tree drawing tool
+\tikzset{every tree node/.style={align=center,anchor=north},
+         level distance=2cm} % Configuration for q-trees
+
+\usepackage[backend=biber,style=numeric,
+            sorting=nyt]{biblatex} % Complete reimplementation of bibliographic facilities
+\addbibresource{ecl.bib}
+\usepackage{csquotes} % Context sensitive quotation facilities
+
+\usepackage[yyyymmdd]{datetime} % Uses YEAR-MONTH-DAY format for dates
+\renewcommand{\dateseparator}{-} % Sets dateseparator to '-'
+
+\usepackage{fancyhdr} % Headers and footers
+\pagestyle{fancy} % All pages have headers and footers
+\fancyhead{}\renewcommand{\headrulewidth}{0pt} % Blank out the default header
+\fancyfoot[L]{University of Manchester} % Custom footer text
+\fancyfoot[C]{} % Custom footer text
+\fancyfoot[R]{\thepage} % Custom footer text
+
+\newcommand{\note}[1]{\marginpar{\scriptsize \textcolor{red}{#1}}} % Enables comments in red on margin
+
+%----------------------------------------------------------------------------------------
+
+\begin{document}
+
+%----------------------------------------------------------------------------------------
+%	TITLE SECTION
+%----------------------------------------------------------------------------------------
+
+\title{template_assignment (UOM)} % Article title
+\fancyhead[C]{}
+\hrule \medskip % Upper rule
+\begin{minipage}{0.295\textwidth} % Left side of title section
+\raggedright
+COMP36212\\ % Your lecture or course
+\footnotesize % Authors text size
+\hfill\\
+Aaron Panaitescu, 10834225% Your name, your matriculation number
+\end{minipage}
+\begin{minipage}{0.4\textwidth} % Center of title section
+\centering
+\large % Title text size
+Testing and Applications of Stochastic Rounding
+\\ % Assignment title and number
+\end{minipage}
+\begin{minipage}{0.295\textwidth} % Right side of title section
+\raggedleft
+\today\\ % Date % Your email
+\end{minipage}
+\medskip\hrule % Lower rule
+\bigskip
+
+%----------------------------------------------------------------------------------------
+%	ARTICLE CONTENTS
+%----------------------------------------------------------------------------------------
+
+\begin{multicols}{2}
+[
+\section{Introduction}
+]
+
+\subsection{Motivation}
+Stochastic rounding maps a real number to one of its floating-point bounds, with probabilities based on the relative distance of those bounds.
+\par
+This report analyses three different applications of stochastic rounding, implemented based on the definition presented in the second week of this unit.
+\begin{align} \label{eq:1}
+\text{SR}(x)=\left \{
+\begin{array}{ll}
+    \text{RA}(x), & \text{if } P < \frac{x - \text{RZ}(x)}{\text{RA}(x) - \text{RZ}(x)}=:p \\
+    \text{RZ}(x), &  \text{if } P \ge p
+\end{array}
+\right.
+\end{align}
+where $x \in \mathbb{R}$, $\text{RA}$ stands for round-away-from-zero, $\text{RZ}$ for round-toward-zero, and $P \in [0, 1)$ is a randomly generated number from a uniform distribution.
+
+\columnbreak
+\subsection{Machine specifications}
+All of the following experiments are done on a Lenovo Legion 5 with the following specifications.
+\begin{table}[H]
+\centering
+\begin{tabular}{ |p{1cm}||p{6cm}|  }
+ \hline
+ \multicolumn{2}{|c|}{Machine Specifications} \\
+ \hline
+ OS & Ubuntu 22.04.3 LTS x86\_64\\
+ \hline
+ CPU & AMD Ryzen 7 5800H with Radeon G\\
+ \hline
+ GCC & (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0 \\
+ \hline
+ FMA & enabled \\
+ \hline
+ 80-bit & enabled \\
+ \hline
+\end{tabular}
+\caption{Specifications of experiment machine}
+\label{table:1}
+\end{table}
+\par
+The C file was compiled with GCC by running
+\verb|gcc -O3 -march=native -mfma assignment1.c -lm|
+\par
+While FMA is enabled, the generated binary doesn't have any FMA instructions. The execution time on this machine is around \verb|25s|.
+\end{multicols}
+
+\begin{multicols}{2}
+[
+\section{Part I: Implementation and testing of binary32 stochastic rounding}
+]
+
+\subsection{Implementation}
+To implement stochastic rounding as defined in \ref{eq:1}, we need to calculate $\text{RA}$ and $\text{RZ}$, then solve for the probability $p$, generate the random number $P$, and use it to choose what to return.
+\subsubsection{Finding RA and RZ}
+\par
+These values lie on the FP bounds of a real number. Their order depends only on the sign of $x$. To compute the FP bounds we use \verb|<math.h>|, which includes a suite of functions$^\text{\cite{CNext}}$ for dealing with neighbouring FP numbers. \verb|nextafterf(f,|$\pm$\verb|INFINITY)| will return the next or previous floating-point number depending on the direction given. Using \verb|nextafterf|, \textbf{algorithm \ref{fig:1}} can be constructed. It works by first computing the nearest floating-point number to $x$. This number has to be a bound, depending on which it is (upper or lower), the other is computed. Then according to the sign of $x$, $\text{RZ}$ and $\text{RA}$ are computed.
+\par
+The number of operations done to compute the bounds can be reduced since, in algorithm \ref{fig:1}, one of the calls to \verb|nextafterf| will inevitably not be used as it isn't a bound of $x$. In \textbf{algorithm \ref{fig:2}} we take advantage of the fact that casting to float is guaranteed to give one of the bounds, we can use another function, \verb|nexttowardf|, in the direction of $x$ to get the opposite bound. With the bounds computed, depending on which is larger and the sign of $x$, $\text{RA}$ and $\text{RZ}$ are set.
+
+\columnbreak
+\begin{figure}[H]
+\centering
+\vspace{0.4in}
+\captionsetup{type=figure, name=Algorithm}
+\begin{minted}
+[
+frame=lines,
+xleftmargin=20pt,
+baselinestretch=0.8,
+fontsize=\scriptsize,
+linenos
+]
+{C}
+void RA_RZ(double x, float *ra, float *rz) {
+  float f = (float) x;
+  float hi = nextafterf(f, INFINITY);
+  float lo = nextafterf(f, -INFINITY);
+
+  if(f > x)
+    hi = f;
+  else if(f < x)
+    lo = f;
+  else {
+    *ra = f;
+    *rz = f;
+    return;
+  }
+
+  if(x > 0.0) {
+    *ra = hi;
+    *rz = lo;
+  } else {
+    *ra = lo;
+    *rz = hi;
+  }
+}
+\end{minted}
+\captionof{figure}[]{RA \& RZ method 1.}
+\label{fig:1}
+\end{figure}
+\begin{figure}[H]
+\centering
+\captionsetup{type=figure, name=Algorithm}
+\begin{minted}
+[
+frame=lines,
+xleftmargin=20pt,
+baselinestretch=0.8,
+fontsize=\scriptsize,
+linenos
+]
+{C}
+void RA_RZ(double x, float *ra, float *rz) {
+  float f1 = (float) x;
+  float f2 = nexttowardf(f1, x);
+
+  if (f1 > f2 == x > 0.0 ){
+    *ra = f1;
+    *rz = f2;
+  } else {
+    *ra = f2;
+    *rz = f1;
+  }
+}
+\end{minted}
+\captionof{figure}[]{RA \& RZ method 2.}
+\label{fig:2}
+\end{figure}
+
+\columnbreak
+\subsubsection{Stochastic rounding}
+With $\text{RA}$ and $\text{RZ}$ computed, implementing stochastic rounding is simply a matter of generating the random number $P \in [0, 1)$, computing the probability $p$, and selecting one of the 2 bounds according to equation \ref{eq:1}. This is shown in \textbf{algorithm \ref{fig:3}}. While not present in the equation, the case where $x$ has a direct representation in floating-point needs to be handled. If $x = \text{RN}(x)$, both methods \ref{fig:1} \& \ref{fig:2} will give $\text{RZ}(x)=\text{RA}(x)=x$. To avoid dividing by 0, algorithm \ref{fig:3} simply returns $\text{RA}(x)$.
+
+\begin{figure}[H]
+\centering
+\captionsetup{type=figure, name=Algorithm}
+\begin{minted}
+[
+frame=lines,
+xleftmargin=20pt,
+baselinestretch=0.8,
+fontsize=\scriptsize,
+linenos
+]
+{C}
+float SR_alternative(double x) {
+  float ra, rz;
+  RA_RZ(x, &ra, &rz);
+
+  if(ra == rz)
+    return ra;
+
+  double p = (x - rz) / (ra - rz);
+  double P = (double) rand() / RAND_MAX;
+  return (P < p) ? ra : rz;
+}
+\end{minted}
+\captionof{figure}[]{Stochastic rounding.}
+\label{fig:3}
+\end{figure}
+
+\subsubsection{Note on random numbers}
+A crucial aspect of the equation \ref{eq:1} is that the random number $P$ is sampled from an uniform distribution. This is mentioned by Michael Hopkins et al.$^\text{\cite{ode}}$ \say{\textit{for SR to be competitive in terms of computation time a very efficient source of high-quality pseudo-random numbers is critically important}}. In our implementation $P$ is computed by \verb|(double)rand()/RAND_MAX|. While \verb|rand()| does generate pseudo-random$^\text{\cite{ISO}}$ numbers from an uniform distribution, \verb|(double)rand()/RAND_MAX| will not cover all double (\verb|IEEE 754|) numbers in the range $[0, 1)$. Moreover, even if we would generate all possible random doubles in in the range $[0, 1)$, they would still not even begin to cover the infinity of reals in the same range.
+\par
+Therfore, the fundamental aspect is that the probability distribution of the attainable values is uniform, with these values being evenly distributed across the range, and not concentrating around any particular value.
+
+\subsection{Validation}
+In order to validate the alternative implementation of stochastic rounding, we repeatedly round a value that is representable in binary64 more accurately than in binary32, and we gather 2 forms of statistics:
+\begin{enumerate}
+    \item Compare the \textbf{probability} of the algorithm of rounding up or down, with the probability of the benchmark implementation and the expected analytical probability.
+    \item Compare the \textbf{average} values as the number of rounding increase of method \ref{fig:3} and the benchmark algorithm against the value of the binary64 number.
+\end{enumerate}
+The default parameters for validation were used, the number $\pi$ (in binary64) was rounded 5 million times.
+\columnbreak
+\subsubsection{Rounding probability}
+The probability of rounding up was used, at each iteration the result of the rounding operations were compared to the high or low bounds of the sample number and recorder in counters. At the end of the iteration the probability of rounding up was calculated using equation \ref{eq:2} and the expected probability was calculated using equation \ref{eq:3}.
+\begin{align}
+    p &= \frac{\#\text{high}}{\#\text{high}+\#\text{low}} \label{eq:2} \\
+    \hat{p} &= \frac{\text{high}_x - x}{\text{high}_x - \text{low}_x} \label{eq:3}
+\end{align}
+The following are the results generated. It is worth noting that while the code deals with randomness these results do not vary significantly and are representative for the performance of the method.
+\begin{table}[H]
+\centering
+\begin{tabular}{ |p{1.5cm}|p{1.5cm}|p{1.5cm}| }
+ \hline
+ expected & benchmark & ours \\
+ \hline
+ 0.633322 & 0.633830 & 0.633333 \\
+ \hline
+\end{tabular}
+\caption{Probability of selecting the upper bound}
+\label{table:2}
+\end{table}
+
+\subsubsection{Average values}
+The absolute errors of the average values were recorded at every 1000th iteration. The absolute error at iteration i is given by this code, where \verb|K| is the total number of iterations and \verb|avg|$^*$ is the sum of the first \verb|i| elements divided by \verb|K|
+\begin{align}
+\texttt{
+    err$_i= |$ sample - avg$^*$ * K / i$|$
+}
+\end{align}
+These values are then saved$^\text{[\ref{appendix:save}]}$ to a file and plotted in a Jupyter Notebook$^\text{[\ref{appendix:plot}]}$.
+
+\begin{figure}[H]
+    \includesvg[width=1.0\columnwidth]{plots/part1.svg}
+    \caption{Absolute error of average of SR overtime}
+    \label{fig:p1}
+\end{figure}
+\begin{figure}[H]
+    \includesvg[width=1.0\columnwidth]{plots/part1_zoom.svg}
+    \caption{Plot \ref{fig:p1} zoomed in}
+    \label{fig:p2}
+\end{figure}
+\newpage
+\end{multicols}
+\subsection{Analysis}
+Both validation tasks prove the out alternative implementation of stochastic rounding is \textbf{performing as expected}. The probability of choosing the upper bound is accurate within 3-4 decimal places, as is the benchmark implementation. The curve of the absolute error of average values over iterations closely matches the benchmark, even very slightly outperforming it after 1.5 million iterations, though this is not a statistically significant improvement as on different seeds the graph can look inverted.
+\par
+It is worth considering the \textbf{speed performance} of this method compared to the benchmark, since it introduces \textit{more} operations and branching. While the two algorithms seem practically equivalent, the benchmark implementation has fewer operations and no branching, and so it is more efficient. Trying to model the logic in equation \ref{eq:1} will inevitably produce more operations. Since the outcome is almost identical, in a performance critical application the benchmark implementation would be better suited.
+
+
+%------------------------------------------------
+
+\begin{multicols}{2}
+[
+\section{Part II: Stagnation and the Harmonic series}\label{part2}
+We compute a truncated version of the harmonic series using the four following methods and analyse the results:
+\begin{packed_enum}
+    \item Recursive summation with binary32 arithmetic and round-to-nearest mode (default implementation)
+    \item Recursive summation with binary32 arithmetic and \textbf{stochastic rounding}
+    \item Compensated summation with binary32 arithmetic and round-to-nearest mode (\texttt{fastTwoSum})
+    \item Recursive summation with binary64 arithmetic and round-to-nearest mode (reference implementation)
+\end{packed_enum}
+Stagnation occurs when increasingly small FP numbers are added to increasingly large ones until $\text{RN}(a + b) = a$, where $a \gg b$. This section tests methods that try to overcome the issue of stagnation. Stochastic mitigates stagnation by introducing the chance to round up ($\text{RA}(x)$) even when $\text{RN}(a + b) = a$. In contrast, compensated summation methods increase accuracy by keep track of a compounded error term which is added back into the sum.
+]
+
+\subsection{Implementation}
+Methods \ref{part2:1} and \ref{part2:4} simply add the cast the next iteration in the harmonic series term to FP and add it into the sum. Stochastic rounding is used in method \ref{part2:2} by casting the sum to binary64 when adding the current term in the series, then using SR to cast it back to binary32. Compensated summation, used in method \ref{part2:3} uses the \verb|fastTwoSum|$^\text{[\ref{appendix:f2s}]}$ function showed in Week 2 to update the sum and the error term.
+
+\begin{figure}[H]
+\centering
+\captionsetup{type=figure, name=Algorithm}
+\begin{minted}
+[
+frame=lines,
+xleftmargin=-10pt,
+baselinestretch=0.8,
+fontsize=\scriptsize,
+escapeinside=||,
+linenos
+]
+{C}
+fharmonic += (float)1/i;|\phantomsection\label{part2:1}|
+fharmonic_sr = SR_alternative((double)fharmonic_sr + (double)1/i); |\phantomsection\label{part2:2}|
+fastTwoSum(fharmonic_comp, (float)1/i + t, &fharmonic_comp, &t); |\phantomsection\label{part2:3}|
+dharmonic += (double)1/i; |\phantomsection\label{part2:4}|
+\end{minted}
+\captionof{figure}[]{Truncated Harmonic Series}
+\label{fig:4}
+\end{figure}
+
+\subsection{Validation}
+In order to verify the correctness of the methods' implementations, the computed sums are compared to the \hyperref[part2:4]{reference}, binary64 round-to-nearest, truncated harmonic sum. Using the first 500 million terms of the harmonic series, the results are presented in table \ref{table:3}
+
+\begin{table}[H]
+\small
+\centering
+\begin{tabular}{ |p{1.5cm}|p{1.5cm}|p{1.5cm}|p{1.5cm}| }
+ \hline
+ RN & SR & fast2sum & \textbf{binary64} \\
+ \hline
+ 15.4036827 & \textbf{20.607}4790 & \textbf{20.607334}1 & \textbf{20.6073343} \\
+ \hline
+\end{tabular}
+\caption{Truncated harmonic sum results}
+\label{table:3}
+\end{table}
+
+and the corresponding absolute errors in table \ref{table:4}.
+\begin{table}[H]
+\centering
+\begin{tabular}{ |p{1.7cm}|p{1.7cm}|p{1.7cm}| }
+ \hline
+ RN & SR & fast2sum \\
+ \hline
+ 5.2036516 & 0.0001447 & 0.0000001\\
+ \hline
+\end{tabular}
+\caption{Truncated harmonic sum errors}
+\label{table:4}
+\end{table}
+These results clearly demonstrate that both stochastic rounding and compensates summation give results that closely match the higher precision reference, validating their implementations. It is also apparent that compensated summation gives the better approximation for this particular task. Furthermore it is apparent that the recursive summation with binary32 arithmetic and round-to-nearest produces inaccurate results. The code also measures that it \textbf{stagnates at $\pmb{i}$ 2,097,152}, in the first 0.004 \%  of iterations.
+
+
+\subsubsection{Absolute Error}
+The absolute errors of the sums were
+recorded at every 1 million iterations. The absolute error
+at iteration $i$ for method $m$ is given by this relation
+\begin{align}
+\texttt{
+    err$_i^m = |$ dharmonic$_i$ - fharmonic$_i^m|$
+}
+\end{align}
+These values are then saved$^\text{[\ref{appendix:save}]}$ to a file and plotted in a Jupyter Notebook$^\text{[\ref{appendix:plot}]}$ using a logarithmic scale.
+\par
+Figure\ref{fig:p3} confirms the trend taking shape in validation where at every time step, compensated summation is the best approach followed by stochastic rounding, and finally round-to-nearest. The point were the RN sum stagnates can also be clearly seen on the graph when the curve suddenly becomes smooth since the only change in the absolute error comes from the reference sum increasing.
+
+\begin{figure}[H]
+    \includesvg[width=1.0\columnwidth]{plots/part2.svg}
+    \caption{Absolute error of harmonic series overtime}
+    \label{fig:p3}
+\end{figure}
+
+\subsection{Analysis}
+It seems clear that the best approach for computing the truncated harmonic series is compensated summation. This is to be expected, since it \textit{directly} tackles the problem of error correction by reducing compounded error. In contrast, stochastic rounding mitigates compounded error in a probabilistic manner, which is less effective for this application.
+\par
+Additionally, once again our implementation of SR incurs some performance overhead compared to the \verb|fastTwoSum| version. The only benefit of SR in this application is that it doesn't require maintaining a compounded error term.
+
+\end{multicols}
+
+\bigskip
+
+%-------------------------------------------------
+
+\begin{multicols}{2}
+[
+\section{Part III: The Riemann zeta function and convergence}
+In this section we are going to analyze the performance of SR on convergent series. We will approximate the Riemann zeta function at $x = 2$. This was shown to converge to $\frac{\pi}{6}^2$ by Euler in 1741$^\text{\cite{Euler}}$.
+\begin{align}
+    \zeta(x) = \sum_{i=1}^\infty \frac{1}{i^x} &= \frac{1}{1^x} + \frac{1}{2^x} + \frac{1}{3^x} + \cdots && , x \in [1, \infty) \\
+    \zeta(2) &= \frac{\pi}{6}^2
+\end{align}
+We will use the same summation methods as in Part II, and compare their performance in relation to the binary64 reference sum.
+]
+
+\subsection{Implementation}
+The implementation is nearly identical to \hyperref[part2]{Part II}, only \verb|i| becomes \verb|i*i|. We should note that the type of \verb|i| should now be \verb|long int| since we need to be able to store its square until iteration 500 million.
+
+\subsection{Results}
+We store$^\text{[\ref{appendix:save}]}$ the absolute error of each method every 100,000 iterations and plot$^\text{[\ref{appendix:plot}]}$ the results in a Jupyter Notebook. The sums calculated after 500 million iterations are shown in table \ref{table:5}
+\begin{table}[H]
+\small
+\centering
+\begin{tabular}{ |p{1.7cm}|p{1.7cm}|p{1.7cm}|p{1.7cm}| }
+ \hline
+ RN & SR & fast2sum & \textbf{binary64} \\
+ \hline
+ 1.644725322 & 1\textbf{.64493}7515 & \textbf{1.64493405}8 & \textbf{1.644934057}  \\
+ \hline
+\end{tabular}
+\caption{Truncated Riemann zeta results}
+\label{table:5}
+\end{table}
+and the corresponding absolute errors in table \ref{table:6}.
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{ |p{1.9cm}|p{1.9cm}|p{1.9cm}| }
+ \hline
+ RN & SR & fast2sum \\
+ \hline
+ 0.0002087351 & 0.0000034574 & 0.0000000003 \\
+ \hline
+\end{tabular}
+\caption{Truncated Riemann zeta errors}
+\label{table:6}
+\end{table}
+These results are consistent with the outcomes in \hyperref[part2]{Part II}, compensated summation produces the best results, followed by stochastic rounding. This is also consistent with the absolute error tracked over iterations, shown in figure \ref{fig:p4}.
+
+\begin{figure}[H]
+    \centering
+    \includesvg[width=1.0\columnwidth]{plots/part3.svg}
+    \caption{Absolute error of Riemann zeta overtime}
+    \label{fig:p4}
+\end{figure}
+
+\subsection{Analysis}
+Once again, the most accurate method proves to be compounded summation. This means that across the board, whether a truncated infinite series diverges or converges, \verb|fastTwoSum| is the more precise method. Stochastic rounding seems to sit right in the middle of RN and compensated summation. These experiments show that stochastic rounding is a balance of memory, speed and accuracy.
+\end{multicols}
+
+\bigskip
+
+\section{Conclusion}
+In this report we have analyzed 3 applications of stochastic rounding: repeated rounding, summing truncated divergent series and summing truncated convergent series. Overall, SR is more accurate than RN in all of these scenarios, but less accurate then compensated summation. SR is best suited for applications where memory efficiency is critical, such as machine learning$^\text{\cite{muller2015rounding}}$, or when modeling sensitive systems which suffer from the rounding bias of FP numbers, such as neural ordinary differential equations$^\text{\cite{ode}}$, or even for systems with inherently probabilistic mechanics such as quantum computing$^\text{\cite{krishnakumar2021quantum}}$.
+
+%----------------------------------------------------------------------------------------
+%	REFERENCE LIST
+%----------------------------------------------------------------------------------------
+
+\printbibliography
+
+\tableofcontents
+
+
+\newpage
+
+\begin{appendices}
+
+\section{Saving Data}
+\label{appendix:save}
+The generation and saving of statistics to a file is determined by the macro constants \verb|SAVE_PART1| and \verb|SAVE_PART2|, they should be defined to the desired name of the output file and the program will save the data in those files. This choice was made to avoid unnecessarily allocating stack memory and perform other unnecessary checks when we are computing statistics.
+\par
+In this projects archive we have included a folder \verb|data/| which contains all the raw data generated and used in this report.
+
+\section{Plotting}
+\label{appendix:plot}
+The plots where created in the provided Jupyter Notebook \verb|Plotting.ipynb|. The following is the script for plotting the Part I data. The rest can be found in the notebook and are very similar.
+\begin{figure}[H]
+\centering
+\captionsetup{type=figure, name=Algorithm}
+\begin{minted}
+[
+frame=lines,
+xleftmargin=20pt,
+baselinestretch=0.8,
+fontsize=\scriptsize,
+linenos
+]
+{python}
+k = len(data)
+xs = np.arange(0, k * 1000 + 1, 1000)
+fig, ax = plt.subplots()
+
+plt.plot(xs[1:], data_def, "b", linewidth=1, label="Benchmark SR")
+plt.plot(xs[1:], data_alt, "r", linewidth=1, label="Alternative SR")
+
+plt.legend()
+plt.gcf().set_size_inches(8, 4)
+plt.gcf().set_dpi(100)
+plt.xticks(xs[::500])
+ax.xaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x // 1000}"))
+ax.set_ylim(top=6e-10) # remove this for non-zommed in version
+plt.xlabel("Iteration (1e3)")
+plt.ylabel("Mean Absolute Error")
+
+# plt.savefig('part1_zoom.svg')
+\end{minted}
+\end{figure}
+
+\section{\texttt{fastTwoSum}}
+\label{appendix:f2s}
+This function is used for compensated summation in \hyperref[part2]{Part II}, it is implemented directly from the Week 2 demonstration as follows.
+\begin{figure}[H]
+\centering
+\captionsetup{type=figure, name=Algorithm}
+\begin{minted}
+[
+frame=lines,
+xleftmargin=20pt,
+baselinestretch=0.8,
+fontsize=\scriptsize,
+linenos
+]
+{C}
+void fastTwoSum (float a, float b, float *s, float *t) {
+  float temp;
+
+  *s = a + b;
+  temp = *s - a;
+  *t = b - temp;
+}
+\end{minted}
+\end{figure}
+
+
+\end{appendices}
+
+%----------------------------------------------------------------------------------------
+
+\end{document}

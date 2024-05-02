@@ -1,0 +1,631 @@
+diff --git a/cw3/docopt.c b/cw3/docopt.c
+index 9f5cf25..5cd9a50 100644
+--- a/cw3/docopt.c
++++ b/cw3/docopt.c
+@@ -230,7 +230,7 @@ int elems_to_args(struct Elements *elements, struct DocoptArgs *args,
+     for (i = 0; i < elements->n_options; i++) {
+         option = &elements->options[i];
+         if (help && option->value && strcmp(option->olong, "--help") == 0) {
+-            for (j = 0; j < 16; j++)
++            for (j = 0; j < 20; j++)
+                 puts(args->help_message[j]);
+             return EXIT_FAILURE;
+         } else if (version && option->value &&
+@@ -245,6 +245,14 @@ int elems_to_args(struct Elements *elements, struct DocoptArgs *args,
+             if (option->argument) {
+                 args->batch_size = (char *) option->argument;
+             }
++        } else if (strcmp(option->olong, "--beta1") == 0) {
++            if (option->argument) {
++                args->beta1 = (char *) option->argument;
++            }
++        } else if (strcmp(option->olong, "--beta2") == 0) {
++            if (option->argument) {
++                args->beta2 = (char *) option->argument;
++            }
+         } else if (strcmp(option->olong, "--dataset_dir") == 0) {
+             if (option->argument) {
+                 args->dataset_dir = (char *) option->argument;
+@@ -253,6 +261,10 @@ int elems_to_args(struct Elements *elements, struct DocoptArgs *args,
+             if (option->argument) {
+                 args->decay = (char *) option->argument;
+             }
++        } else if (strcmp(option->olong, "--epsilon") == 0) {
++            if (option->argument) {
++                args->epsilon = (char *) option->argument;
++            }
+         } else if (strcmp(option->olong, "--learning_rate") == 0) {
+             if (option->argument) {
+                 args->learning_rate = (char *) option->argument;
+@@ -261,6 +273,10 @@ int elems_to_args(struct Elements *elements, struct DocoptArgs *args,
+             if (option->argument) {
+                 args->momentum = (char *) option->argument;
+             }
++        } else if (strcmp(option->olong, "--optimizer") == 0) {
++            if (option->argument) {
++                args->optimizer = (char *) option->argument;
++            }
+         } else if (strcmp(option->olong, "--total_epochs") == 0) {
+             if (option->argument) {
+                 args->total_epochs = (char *) option->argument;
+@@ -294,8 +310,9 @@ int elems_to_args(struct Elements *elements, struct DocoptArgs *args,
+ 
+ struct DocoptArgs docopt(int argc, char *argv[], const bool help, const char *version) {
+     struct DocoptArgs args = {
+-        0, 0, 0, 0, (char *) "10", (char *) "mnist_data/", NULL, (char *)
+-        "0.01", NULL, (char *) "10",
++        0, 0, 0, 0, (char *) "10", (char *) "0.9", (char *) "0.999", (char *)
++        "mnist_data/", NULL, (char *) "1e-8", (char *) "0.01", NULL, (char *)
++        "sgd", (char *) "10",
+             usage_pattern,
+             { "Program.",
+               "",
+@@ -307,12 +324,16 @@ struct DocoptArgs docopt(int argc, char *argv[], const bool help, const char *ve
+               "",
+               "Options:",
+               "  -h --help                 Show this screen.",
+-              "  -e --total_epochs=<te>    Passes through the training set [default: 10].",
+-              "  -d --dataset_dir=<dd>     Dataset directory path [default: mnist_data/].",
+-              "  -b --batch_size=<bs>      Number of samples per batch [default: 10].",
+-              "  -l --learning_rate=<lr>   Learning rate for training [default: 0.01].",
+-              "  -L --decay=<dc>           Learning rate to decay to.",
+-              "  -m --momentum=<mm>        Update weights with momentum."}
++              "  -e --total_epochs=<int>    Passes through the training set [default: 10].",
++              "  -d --dataset_dir=<path>     Dataset directory path [default: mnist_data/].",
++              "  -b --batch_size=<int>      Number of samples per batch [default: 10].",
++              "  -o --optimizer=<str>      Type of optimizer sgd, momentum or adam [default: sgd].",
++              "  -l --learning_rate=<float>   Learning rate for training [default: 0.01].",
++              "  --decay=<float>           Learning rate to decay to.",
++              "  -m --momentum=<float> Update weights with momentum. [default: 0.9]",
++              "  --beta1=<float>              Beta1 parameter for the Adam optimizer [default: 0.9].",
++              "  --beta2=<float>              Beta2 parameter for the Adam optimizer [default: 0.999].",
++              "  --epsilon=<float>           Epsilon parameter for the Adam optimizer [default: 1e-8]."}
+     };
+     struct Tokens ts;
+     struct Command commands[] = {
+@@ -325,10 +346,14 @@ struct DocoptArgs docopt(int argc, char *argv[], const bool help, const char *ve
+         {"-h", "--help", 0, 0, NULL},
+         {NULL, "--version", 0, 0, NULL},
+         {"-b", "--batch_size", 1, 0, NULL},
++        {NULL, "--beta1", 1, 0, NULL},
++        {NULL, "--beta2", 1, 0, NULL},
+         {"-d", "--dataset_dir", 1, 0, NULL},
+-        {"-L", "--decay", 1, 0, NULL},
++        {NULL, "--decay", 1, 0, NULL},
++        {NULL, "--epsilon", 1, 0, NULL},
+         {"-l", "--learning_rate", 1, 0, NULL},
+         {"-m", "--momentum", 1, 0, NULL},
++        {"-o", "--optimizer", 1, 0, NULL},
+         {"-e", "--total_epochs", 1, 0, NULL}
+     };
+     struct Elements elements;
+@@ -336,7 +361,7 @@ struct DocoptArgs docopt(int argc, char *argv[], const bool help, const char *ve
+ 
+     elements.n_commands = 2;
+     elements.n_arguments = 0;
+-    elements.n_options = 8;
++    elements.n_options = 12;
+     elements.commands = commands;
+     elements.arguments = arguments;
+     elements.options = options;
+diff --git a/cw3/docopt.h b/cw3/docopt.h
+index 9f18ee3..ec82d26 100644
+--- a/cw3/docopt.h
++++ b/cw3/docopt.h
+@@ -84,14 +84,18 @@ struct DocoptArgs {
+     size_t version;
+     /* options with arguments */
+     char *batch_size;
++    char *beta1;
++    char *beta2;
+     char *dataset_dir;
+     char *decay;
++    char *epsilon;
+     char *learning_rate;
+     char *momentum;
++    char *optimizer;
+     char *total_epochs;
+     /* special */
+     const char *usage_pattern;
+-    const char *help_message[16];
++    const char *help_message[20];
+ };
+ 
+ struct DocoptArgs docopt(int, char *[], bool, const char *);
+diff --git a/cw3/main.c b/cw3/main.c
+index c69fb49..e68b7bb 100644
+--- a/cw3/main.c
++++ b/cw3/main.c
+@@ -55,6 +55,8 @@ void train(struct DocoptArgs args){
+     double learning_rate = atof(args.learning_rate);
+     double decay, momentum;
+ 
++
++
+     if(args.decay == NULL) {
+         decay = learning_rate;
+     } else {
+@@ -65,6 +67,7 @@ void train(struct DocoptArgs args){
+     if(args.momentum == NULL) {
+         momentum = 0.0;
+     } else {
++        printf("Momentum: %s\n", args.momentum);
+         momentum = atof(args.momentum);
+     }
+ 
+@@ -84,7 +87,7 @@ void train(struct DocoptArgs args){
+     printf("********************************************************************************\n");
+     printf("Initialising optimiser...\n");
+     printf("********************************************************************************\n");
+-    initialise_optimiser(learning_rate, batch_size, total_epochs, decay, momentum);
++    initialise_optimiser(args);
+ 
+ 
+     printf("********************************************************************************\n");
+diff --git a/cw3/neural_network.c b/cw3/neural_network.c
+index 183016f..670db9c 100644
+--- a/cw3/neural_network.c
++++ b/cw3/neural_network.c
+@@ -289,7 +289,7 @@ void evaluate_dL_dP(uint8_t label){
+ }
+ 
+ void evaluate_dP_dhO(void){
+-    #pragma omp parallel for
++    #pragma omp parallel for collapse(2)
+     for (int i = 0; i < N_NEURONS_LO; i++){
+         for (int j = 0; j<N_NEURONS_LO; j++){
+             // No need to reset term to zero, as every term in Jacobian is to be re-evaluated
+@@ -306,7 +306,7 @@ void inline evaluate_dh_dW_Lh_Lprev(unsigned int n_h,
+                              unsigned int n_prev,
+                              n_ReLu neur[n_prev],
+                              unsigned int n_W, double J[][n_W]){
+-    #pragma omp parallel for
++    #pragma omp parallel for collapse(2)
+     for (int i = 0; i < n_h; i++){
+         for (int j = 0; j < (n_W); j++){
+             if (j >= (i * n_prev) && j < ((i+1) * n_prev)) {
+@@ -332,7 +332,7 @@ void inline evaluate_dh_dW_Lh_Lprev_sparse(unsigned int n_h,
+ }
+ 
+ void evaluate_dh1_dW_LI_L1(unsigned int sample){
+-    #pragma omp parallel for
++    #pragma omp parallel for collapse(2)
+     for (int i=0; i<N_NEURONS_L1; i++){
+         for (int j=0; j<(N_NEURONS_LI*N_NEURONS_L1); j++){
+             if (j >= (i*N_NEURONS_LI) && j < ((i+1) * N_NEURONS_LI)) {
+@@ -355,7 +355,7 @@ void inline evaluate_dh1_dW_LI_L1_sparse(unsigned int sample){
+ }
+ 
+ void inline evaluate_dh_dh_prev_inc_pre_act(unsigned int n_h, unsigned int n_prev, n_ReLu n_Lh[n_prev], weight_struct_t W[][n_h], double J[][n_prev]){
+-    #pragma omp parallel for
++    #pragma omp parallel for collapse(2)
+     for (int i=0; i<n_h; i++){
+         for (int j=0; j < n_prev; j++){
+             if(n_Lh[j].h > 0.0){
+@@ -453,7 +453,6 @@ void compute_softmax(void){
+     sft_max_denom = 1.0/sft_max_denom;
+     
+     // Compute softmax
+-    #pragma omp parallel for
+     for (int i=0; i<N_NEURONS_LO; i++){
+         n_LO[i].P = exp(n_LO[i].z) * sft_max_denom;
+         //        printf("P output %u: %6.12f (logit value: %6.12f) \n", i, n_LO[i].P, n_LO[i].z);
+@@ -575,7 +574,7 @@ void evaluate_backward_pass_sparse(uint8_t label, unsigned int input_class_index
+ 
+ void store_gradient_contributions(void){
+     // dW_L3_LO
+-    #pragma omp parallel for
++    #pragma omp parallel for collapse(2)
+     for (int i = 0; i < N_NEURONS_L3; i++){
+         for (int j=0; j < N_NEURONS_LO; j++){
+             w_L3_LO[i][j].dw += dL_dW_L3_LO[0][(i + (N_NEURONS_L3 * j))];
+@@ -583,7 +582,7 @@ void store_gradient_contributions(void){
+     }
+ 
+     // dW_L2_L3
+-    #pragma omp parallel for
++    #pragma omp parallel for collapse(2)
+     for (int i = 0; i < N_NEURONS_L2 ; i++){
+         for (int j=0; j < N_NEURONS_L3; j++){
+             w_L2_L3[i][j].dw +=  dL_dW_L2_L3[0][(i + (N_NEURONS_L2 * j))];
+@@ -591,7 +590,7 @@ void store_gradient_contributions(void){
+     }
+     
+     // dW_L1_L2
+-    #pragma omp parallel for
++    #pragma omp parallel for collapse(2)
+     for (int i = 0; i < N_NEURONS_L1 ; i++){
+         for (int j=0; j < N_NEURONS_L2; j++){
+             w_L1_L2[i][j].dw +=  dL_dW_L1_L2[0][(i + (N_NEURONS_L1 * j))];
+@@ -599,7 +598,7 @@ void store_gradient_contributions(void){
+     }
+     
+     // dW_LI_L1
+-    #pragma omp parallel for
++    #pragma omp parallel for collapse(2)
+     for (int i = 0; i < N_NEURONS_LI ; i++){
+         for (int j=0; j < N_NEURONS_L1; j++){
+             w_LI_L1[i][j].dw += dL_dW_LI_L1[0][(i + (N_NEURONS_LI * j))];
+diff --git a/cw3/optimiser.c b/cw3/optimiser.c
+index 08d2fde..f443c07 100644
+--- a/cw3/optimiser.c
++++ b/cw3/optimiser.c
+@@ -1,4 +1,5 @@
+ #include "optimiser.h"
++#include "docopt.h"
+ #include "mnist_helper.h"
+ #include "neural_network.h"
+ #include "math.h"
+@@ -6,57 +7,132 @@
+ #include <math.h>
+ #include <stdio.h>
+ #include <stdlib.h>
++#include <string.h>
+ #include <time.h>
+ #include <omp.h>
+ 
+ // Function declarations
+-void update_parameters(unsigned int batch_size);
+-void update_parameters_momentum(unsigned int batch_size);
+-void update_parameters_adam(unsigned int batch_size, unsigned int t);
++void update_parameters();
+ void print_training_stats(unsigned int epoch_counter, unsigned int total_iter, double mean_loss, double test_accuracy);
+ 
+ // Optimisation parameters
+ unsigned int log_freq = 30000; // Compute and print accuracy every log_freq iterations
++struct timespec start, end;
++
++typedef enum {
++    OPTIMIZER_ADAM,
++    OPTIMIZER_MOMENTUM,
++    OPTIMIZER_SGD
++} OptimizerType;
++
++typedef struct {
++    double beta1;
++    double beta2;
++    double epsilon;
++    unsigned int t;  // Time step for Adam-specific operations
++} AdamConfig;
++
++void update_weights_adam(weight_struct_t *weights, unsigned int rows, unsigned int cols);
++
++typedef struct {
++    double beta;
++} MomentumConfig;
++
++void update_weights_momentum(weight_struct_t *weights, unsigned int rows, unsigned int cols);
++
++typedef struct {
++} SGDConfig;
++
++void update_weights(weight_struct_t *weights, unsigned int rows, unsigned int cols);
++
++typedef struct Optimizer Optimizer;
++
++typedef void (*UpdateWeightsFunc)(weight_struct_t *weights, unsigned int rows, unsigned int cols);
++
++struct Optimizer {
++    double alpha;
++    double alpha_0;
++    double alpha_N;
++    unsigned int batch_size;
++    unsigned int num_batches;
++    unsigned int epochs;
++    OptimizerType type;
++    union {
++        AdamConfig adam;
++        MomentumConfig momentum;
++        SGDConfig sgd;
++    } config;
++    UpdateWeightsFunc update_weights;
++} optimizer;
+ 
+-// Parameters passed from command line arguments
+-unsigned int num_batches;
+-unsigned int batch_size;
+-unsigned int total_epochs;
+-double learning_rate;
+-double learning_rate_0;
+-double learning_rate_N;
+-double momentum;
+ 
+ void print_training_stats(unsigned int epoch_counter, unsigned int total_iter, double mean_loss, double test_accuracy){
+-    printf("Epoch: %u,  Total iter: %u,  Mean Loss: %0.12f,  Test Acc: %f, Learning Rate: %f\n", epoch_counter, total_iter, mean_loss, test_accuracy, learning_rate);
++    clock_gettime(CLOCK_MONOTONIC, &end);
++    double elapsed = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1e9;
++    printf("Epoch: %u,  Total iter: %u,  Mean Loss: %0.12f,  Test Acc: %f, Elapsed: %f\n",
++           epoch_counter, total_iter, mean_loss, test_accuracy, elapsed);
++    clock_gettime(CLOCK_MONOTONIC, &start);
+ }
+ 
+-void initialise_optimiser(double cmd_line_learning_rate, int cmd_line_batch_size, int cmd_line_total_epochs,
+-                          double cmd_line_decay, double cmd_line_momentum){
+-    batch_size = cmd_line_batch_size;
+-    learning_rate = cmd_line_learning_rate;
+-    total_epochs = cmd_line_total_epochs;
+-    learning_rate_N = cmd_line_decay;
+-    learning_rate_0 = cmd_line_learning_rate;
+-    momentum = cmd_line_momentum;
+-
+-    num_batches = total_epochs * (N_TRAINING_SET / batch_size);
+-    printf("Optimising with parameters: \n\tepochs = %u \n\tbatch_size = %u \n\tnum_batches = %u\n\tlearning_rate_0 = %f\n\tlearning_rate_N = %f\n\tmomentum = %f\n\n",
+-           total_epochs, batch_size, num_batches, learning_rate_0, learning_rate_N, momentum);
++void initialise_optimiser(struct DocoptArgs args){
++    optimizer.alpha = atof(args.learning_rate);
++    optimizer.alpha_0 = optimizer.alpha;
++    optimizer.alpha_N = args.decay == NULL ? optimizer.alpha : atof(args.decay);
++    optimizer.epochs = atoi(args.total_epochs);
++    optimizer.batch_size = atoi(args.batch_size);
++    optimizer.num_batches = optimizer.epochs * (N_TRAINING_SET / optimizer.batch_size);
++
++    if(strcmp(args.optimizer, "sgd") == 0) {
++        optimizer.type = OPTIMIZER_SGD;
++        optimizer.update_weights = update_weights;
++    } else if (strcmp(args.optimizer, "momentum") == 0) {
++        optimizer.type = OPTIMIZER_MOMENTUM;
++        optimizer.update_weights = update_weights_momentum;
++        optimizer.config.momentum.beta = atof(args.momentum);
++    } else if (strcmp(args.optimizer, "adam") == 0) {
++        optimizer.type = OPTIMIZER_ADAM;
++        optimizer.update_weights = update_weights_adam;
++        optimizer.config.adam.beta1 = atof(args.beta1);
++        optimizer.config.adam.beta2 = atof(args.beta2);
++        optimizer.config.adam.epsilon = atof(args.epsilon);
++        optimizer.config.adam.t = 0;
++    } else {
++        printf("ERROR: invalid optimizer '%s'\nAvailable options are: [sgd, momentum, adam]\n", args.optimizer);
++        exit(-1);
++    }
++
++    printf("Optimizing with parameters: \n\tEpochs = %u \n\tBatch size = %u \n\tTotal batches = %u\n",
++           optimizer.epochs, optimizer.batch_size, optimizer.num_batches);
++
++    if(optimizer.type == OPTIMIZER_ADAM) {
++        printf("\tAdam Optimizer\n\tLearning rate = %f\n\tBeta1 = %f\n\tBeta2 = %f\n\tEpsilon = %e\n",
++               optimizer.alpha, optimizer.config.adam.beta1, optimizer.config.adam.beta2, optimizer.config.adam.epsilon);
++    } else if(optimizer.type == OPTIMIZER_MOMENTUM) {
++        printf("\tMomentum Optimizer\n\tLearning rate = %f\n\tMomentum = %f\n",
++               optimizer.alpha, optimizer.config.momentum.beta);
++    } else if(optimizer.type == OPTIMIZER_SGD) {
++        printf("\tSGD Optimizer\n\tLearning rate = %f\n",
++               optimizer.alpha);
++    }
++
++    if (args.decay) {
++        printf("\tDecaying to Learning Rate = %f by end of training.\n", optimizer.alpha_N);
++    }
++    printf("\n");
+ }
+ 
+ void run_optimisation(void){
+     unsigned int training_sample = 0;
+-    unsigned int total_iter = 0, t = 0;
++    unsigned int total_iter = 0;
+     double obj_func = 0.0;
+     unsigned int epoch_counter = 0;
+     double test_accuracy = 0.0;  //evaluate_testing_accuracy();
+     double mean_loss = 0.0;
++    clock_gettime(CLOCK_MONOTONIC, &start);
+     
+     // Run optimiser - update parameters after each minibatch
+-    for (int i=0; i < num_batches; i++){
+-        for (int j = 0; j < batch_size; j++){
+-
++    for (int i=0; i < optimizer.num_batches; i++){
++        for (int j = 0; j < optimizer.batch_size; j++){
+             // Evaluate accuracy on testing set (expensive, evaluate infrequently)
+             if (total_iter % log_freq == 0 || total_iter == 0){
+                 if (total_iter > 0){
+@@ -79,19 +155,18 @@ void run_optimisation(void){
+             training_sample++;
+             // On epoch completion:
+             if (training_sample == N_TRAINING_SET){
+-                double alpha = ((double) epoch_counter + 1) / ((double) total_epochs);
+-                learning_rate = (1 - alpha) * learning_rate_0 + alpha * learning_rate_N;
++                double alpha = ((double) epoch_counter + 1) / ((double) optimizer.epochs);
++                optimizer.alpha = (1 - alpha) * optimizer.alpha_0 + alpha * optimizer.alpha_N;
+                 training_sample = 0;
+                 epoch_counter++;
+             }
+         }
+-        
++
+         // Update weights on batch completion
+-        if(momentum != 0.0){
+-            update_parameters_momentum(batch_size);
+-        } else {
+-            update_parameters_adam(batch_size, ++t);
++        if(optimizer.type == OPTIMIZER_ADAM) {
++            optimizer.config.adam.t++;
+         }
++        update_parameters();
+     }
+     
+     // Print final performance
+@@ -108,38 +183,40 @@ double evaluate_objective_function(unsigned int sample){
+ 
+ double compute_loss(unsigned int sample){
+     evaluate_forward_pass(training_data, sample);
+-    double loss = compute_xent_loss(training_labels[sample]);
+-    return loss;
++    return compute_xent_loss(training_labels[sample]);
+ }
+ 
+ void update_weights(weight_struct_t *weights, unsigned int rows, unsigned int cols) {
+-    #pragma omp parallel for
++    #pragma omp parallel for collapse(2)
+     for(int i = 0; i < rows; ++i) {
+         for (int j = 0; j < cols; ++j) {
+-            weights[i * cols + j].w -= learning_rate / batch_size * weights[i * cols + j].dw;
++            weights[i * cols + j].w -= optimizer.alpha / optimizer.batch_size * weights[i * cols + j].dw;
+             weights[i * cols + j].dw = 0.0;
+         }
+     }
+ }
+ 
+ void update_weights_momentum(weight_struct_t *weights, unsigned int rows, unsigned int cols) {
+-    #pragma omp parallel for
++    #pragma omp parallel for collapse(2)
+     for(int i = 0; i < rows; ++i) {
+         for (int j = 0; j < cols; ++j) {
+-            weights[i * cols + j].v = momentum * weights[i * cols + j].v - learning_rate / batch_size * weights[i * cols + j].dw;
++            weights[i * cols + j].v = optimizer.config.momentum.beta * weights[i * cols + j].v - optimizer.alpha / optimizer.batch_size * weights[i * cols + j].dw;
+             weights[i * cols + j].w += weights[i * cols + j].v;
+             weights[i * cols + j].dw = 0.0;
+         }
+     }
+ }
+ 
+-void update_weights_adam(weight_struct_t *weights, unsigned int rows, unsigned int cols, unsigned int t) {
+-    double beta1 = 0.9, beta2 = 0.999, epsilon = 1e-8, alpha = 0.001, avg_dw, alphat;
+-    alphat = alpha * sqrt(1 - pow(beta2, t)) / (1 - pow(beta1, t));
+-    #pragma omp parallel for
++void update_weights_adam(weight_struct_t *weights, unsigned int rows, unsigned int cols) {
++    double beta1 = optimizer.config.adam.beta1, beta2 = optimizer.config.adam.beta2,
++        epsilon = optimizer.config.adam.epsilon, alpha = optimizer.alpha, avg_dw,
++        t = optimizer.config.adam.t,
++        alphat = alpha * sqrt(1 - pow(beta2, t)) / (1 - pow(beta1, t));
++
++    #pragma omp parallel for collapse(2)
+     for(int i = 0; i < rows; ++i) {
+         for (int j = 0; j < cols; ++j) {
+-            avg_dw = weights[i * cols + j].dw / batch_size;
++            avg_dw = weights[i * cols + j].dw / optimizer.batch_size;
+             weights[i * cols + j].m = beta1 * weights[i * cols + j].m + (1 - beta1) * avg_dw;
+             weights[i * cols + j].v = beta2 * weights[i * cols + j].v + (1 - beta2) * avg_dw * avg_dw;
+             weights[i * cols + j].w -= alphat * weights[i * cols + j].m / (sqrt(weights[i * cols + j].v) + epsilon);
+@@ -148,28 +225,16 @@ void update_weights_adam(weight_struct_t *weights, unsigned int rows, unsigned i
+     }
+ }
+ 
+-void update_parameters(unsigned int batch_size){
+-    update_weights((weight_struct_t *)w_L3_LO, N_NEURONS_L3, N_NEURONS_LO);
+-    update_weights((weight_struct_t *)w_L2_L3, N_NEURONS_L2, N_NEURONS_L3);
+-    update_weights((weight_struct_t *)w_L1_L2, N_NEURONS_L1, N_NEURONS_L2);
+-    update_weights((weight_struct_t *)w_LI_L1, N_NEURONS_LI, N_NEURONS_L1);
++void update_parameters(){
++    optimizer.update_weights((weight_struct_t *)w_L3_LO, N_NEURONS_L3, N_NEURONS_LO);
++    optimizer.update_weights((weight_struct_t *)w_L2_L3, N_NEURONS_L2, N_NEURONS_L3);
++    optimizer.update_weights((weight_struct_t *)w_L1_L2, N_NEURONS_L1, N_NEURONS_L2);
++    optimizer.update_weights((weight_struct_t *)w_LI_L1, N_NEURONS_LI, N_NEURONS_L1);
+ }
+ 
+-
+-void update_parameters_momentum(unsigned int batch_size){
+-    update_weights_momentum((weight_struct_t *)w_L3_LO, N_NEURONS_L3, N_NEURONS_LO);
+-    update_weights_momentum((weight_struct_t *)w_L2_L3, N_NEURONS_L2, N_NEURONS_L3);
+-    update_weights_momentum((weight_struct_t *)w_L1_L2, N_NEURONS_L1, N_NEURONS_L2);
+-    update_weights_momentum((weight_struct_t *)w_LI_L1, N_NEURONS_LI, N_NEURONS_L1);
+-}
+-
+-
+-void update_parameters_adam(unsigned int batch_size, unsigned int t){
+-    update_weights_adam((weight_struct_t *)w_L3_LO, N_NEURONS_L3, N_NEURONS_LO, t);
+-    update_weights_adam((weight_struct_t *)w_L2_L3, N_NEURONS_L2, N_NEURONS_L3, t);
+-    update_weights_adam((weight_struct_t *)w_L1_L2, N_NEURONS_L1, N_NEURONS_L2, t);
+-    update_weights_adam((weight_struct_t *)w_LI_L1, N_NEURONS_LI, N_NEURONS_L1, t);
+-}
++/*******************************************************************************
++ *                            GRADIENT CHECKING
++ *******************************************************************************/
+ 
+ 
+ #define EPSILON 1e-4
+@@ -184,8 +249,8 @@ double compute_numerical_gradient(double *weight, unsigned int sample) {
+ }
+ 
+ void check_layer_gradients(weight_struct_t *weights, double *gradients, unsigned int rows,
+-                             unsigned int cols, unsigned int sample, char* name, unsigned int max_checks,
+-                             double *error_sum, double *a_time, double *n_time, unsigned int *checks){
++                           unsigned int cols, unsigned int sample, char* name, unsigned int max_checks,
++                           double *error_sum, double *a_time, double *n_time, unsigned int *checks){
+     double a_grad, n_grad;
+     struct timespec start, end;
+ 
+diff --git a/cw3/optimiser.h b/cw3/optimiser.h
+index 7be8b72..08c464e 100644
+--- a/cw3/optimiser.h
++++ b/cw3/optimiser.h
+@@ -1,10 +1,11 @@
+ #ifndef OPTIMISER_H
+ #define OPTIMISER_H
+ 
++#include "docopt.h"
+ #include "neural_network.h"
+ #include <stdio.h>
+ 
+-void initialise_optimiser(double learning_rate, int batch_size, int total_epochs, double decay, double momentum);
++void initialise_optimiser(struct DocoptArgs args);
+ void run_optimisation(void);
+ double evaluate_objective_function(unsigned int sample);
+ double compute_loss(unsigned int sample);
+diff --git a/cw3/results.md b/cw3/results.md
+index dd03645..342ad57 100644
+--- a/cw3/results.md
++++ b/cw3/results.md
+@@ -63,3 +63,40 @@ Epoch: 8,  Total iter: 510000,  Mean Loss: 0.018814615718,  Test Acc: 0.980100,
+ Epoch: 9,  Total iter: 540000,  Mean Loss: 0.022382536410,  Test Acc: 0.973200, Learning Rate: 0.010000
+ Epoch: 9,  Total iter: 570000,  Mean Loss: 0.018158887838,  Test Acc: 0.980700, Learning Rate: 0.010000
+ Epoch: 10,  Total iter: 600000,  Mean Loss: 0.018394954294,  Test Acc: 0.975300, Learning Rate: 0.010000
++
++
++Optimizing with parameters: 
++	Epochs = 10 
++	Batch size = 50 
++	Total batches = 12000
++	Adam Optimizer
++	Learning rate = 0.001000
++	Beta1 = 0.900000
++	Beta2 = 0.999000
++	Epsilon = 1.000000e-08
++
++********************************************************************************
++Performing training optimisation...
++********************************************************************************
++Epoch: 0,  Total iter: 0,  Mean Loss: 0.000000000000,  Test Acc: 0.088900, Elapsed: 0.721558
++Epoch: 0,  Total iter: 30000,  Mean Loss: 0.323290231550,  Test Acc: 0.946000, Elapsed: 10.097993
++Epoch: 1,  Total iter: 60000,  Mean Loss: 0.156759911733,  Test Acc: 0.955700, Elapsed: 11.054906
++Epoch: 1,  Total iter: 90000,  Mean Loss: 0.106543437662,  Test Acc: 0.968100, Elapsed: 9.669278
++Epoch: 2,  Total iter: 120000,  Mean Loss: 0.089951136519,  Test Acc: 0.965600, Elapsed: 9.629248
++Epoch: 2,  Total iter: 150000,  Mean Loss: 0.065342284822,  Test Acc: 0.975000, Elapsed: 10.872970
++Epoch: 3,  Total iter: 180000,  Mean Loss: 0.061254117176,  Test Acc: 0.972800, Elapsed: 9.321948
++Epoch: 3,  Total iter: 210000,  Mean Loss: 0.045530494188,  Test Acc: 0.979300, Elapsed: 8.929551
++Epoch: 4,  Total iter: 240000,  Mean Loss: 0.046017284442,  Test Acc: 0.967600, Elapsed: 11.387055
++Epoch: 4,  Total iter: 270000,  Mean Loss: 0.042173727911,  Test Acc: 0.978500, Elapsed: 8.961761
++Epoch: 5,  Total iter: 300000,  Mean Loss: 0.039911361633,  Test Acc: 0.976500, Elapsed: 9.129150
++Epoch: 5,  Total iter: 330000,  Mean Loss: 0.029716339093,  Test Acc: 0.972600, Elapsed: 11.118518
++Epoch: 6,  Total iter: 360000,  Mean Loss: 0.032155174214,  Test Acc: 0.975300, Elapsed: 9.115172
++Epoch: 6,  Total iter: 390000,  Mean Loss: 0.026369905132,  Test Acc: 0.979700, Elapsed: 9.166036
++Epoch: 7,  Total iter: 420000,  Mean Loss: 0.025032769871,  Test Acc: 0.981100, Elapsed: 11.291423
++Epoch: 7,  Total iter: 450000,  Mean Loss: 0.021198104655,  Test Acc: 0.974400, Elapsed: 9.300198
++Epoch: 8,  Total iter: 480000,  Mean Loss: 0.024112951188,  Test Acc: 0.968700, Elapsed: 9.359318
++Epoch: 8,  Total iter: 510000,  Mean Loss: 0.021839596210,  Test Acc: 0.978200, Elapsed: 11.328666
++Epoch: 9,  Total iter: 540000,  Mean Loss: 0.021855863248,  Test Acc: 0.978100, Elapsed: 9.391775
++Epoch: 9,  Total iter: 570000,  Mean Loss: 0.020199466049,  Test Acc: 0.981100, Elapsed: 9.359081
++Epoch: 10,  Total iter: 600000,  Mean Loss: 0.018375815084,  Test Acc: 0.973700, Elapsed: 10.574139
++********************************************************************************
+diff --git a/cw3/usage.docopt b/cw3/usage.docopt
+index ff6bc2b..98db81f 100644
+--- a/cw3/usage.docopt
++++ b/cw3/usage.docopt
+@@ -8,9 +8,13 @@ Usage:
+ 
+ Options:
+   -h --help                 Show this screen.
+-  -e --total_epochs=<te>    Passes through the training set [default: 10].
+-  -d --dataset_dir=<dd>     Dataset directory path [default: mnist_data/].
+-  -b --batch_size=<bs>      Number of samples per batch [default: 10].
+-  -l --learning_rate=<lr>   Learning rate for training [default: 0.01].
+-  -L --decay=<dc>           Learning rate to decay to.
+-  -m --momentum=<mm>        Update weights with momentum.
++  -e --total_epochs=<int>    Passes through the training set [default: 10].
++  -d --dataset_dir=<path>     Dataset directory path [default: mnist_data/].
++  -b --batch_size=<int>      Number of samples per batch [default: 10].
++  -o --optimizer=<str>      Type of optimizer sgd, momentum or adam [default: sgd].
++  -l --learning_rate=<float>   Learning rate for training [default: 0.01].
++  --decay=<float>           Learning rate to decay to.
++  -m --momentum=<float> Update weights with momentum. [default: 0.9]
++  --beta1=<float>              Beta1 parameter for the Adam optimizer [default: 0.9].
++  --beta2=<float>              Beta2 parameter for the Adam optimizer [default: 0.999].
++  --epsilon=<float>           Epsilon parameter for the Adam optimizer [default: 1e-8].

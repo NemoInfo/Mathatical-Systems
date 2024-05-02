@@ -1,0 +1,20 @@
+Program.
+
+Usage:
+  program train [options]
+  program check
+  program --help
+  program --version
+
+Options:
+  -h --help                 Show this screen.
+  -e --total_epochs=<int>    Passes through the training set [default: 10].
+  -d --dataset_dir=<path>     Dataset directory path [default: mnist_data/].
+  -b --batch_size=<int>      Number of samples per batch [default: 10].
+  -o --optimizer=<str>      Type of optimizer sgd, momentum or adam [default: sgd].
+  -l --learning_rate=<float>   Learning rate for training [default: 0.01].
+  --decay=<float>           Learning rate to decay to.
+  -m --momentum=<float> Update weights with momentum. [default: 0.9]
+  --beta1=<float>              Beta1 parameter for the Adam optimizer [default: 0.9].
+  --beta2=<float>              Beta2 parameter for the Adam optimizer [default: 0.999].
+  --epsilon=<float>           Epsilon parameter for the Adam optimizer [default: 1e-8].
